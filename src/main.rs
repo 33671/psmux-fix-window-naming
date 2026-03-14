@@ -591,7 +591,7 @@ fn run_main() -> io::Result<()> {
                                     if resp.contains("OK") {
                                         // Apply window name if specified
                                         if let Some(ref wn) = window_name {
-                                            env::set_var("PSMUX_TARGET_SESSION", &name);
+                                            env::set_var("PSMUX_TARGET_SESSION", &port_file_base);
                                             let _ = send_control_with_response(
                                                 format!("rename-window {}\n", wn));
                                         }
