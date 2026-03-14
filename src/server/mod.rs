@@ -531,7 +531,7 @@ pub fn run_server(session_name: String, socket_name: Option<String>, initial_com
     }
     if let Some(prev) = saved_dir { env::set_current_dir(prev).ok(); }
     // Apply window name if specified via -n
-    if let Some(n) = window_name { app.windows.last_mut().map(|w| w.name = n); }
+    if let Some(n) = window_name { app.windows.last_mut().map(|w| { w.name = n; w.manual_rename = true; }); }
     // Replenish: spawn a warm pane for the NEXT new-window / split.
     // For detached sessions without init_size, defer until first ClientSize.
     if init_size.is_some() && app.warm_pane.is_none() {
