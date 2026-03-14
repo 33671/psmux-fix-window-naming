@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -17,26 +17,56 @@ env:
 
 jobs:
   build:
-    name: Build ${{ matrix.label }}
+    name: Build Windows x64
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-pc-windows-msvc
-            label: Windows x64
-          - target: i686-pc-windows-msvc
-            label: Windows x86
-          - target: aarch64-pc-windows-msvc
-            label: Windows ARM64
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: x86_64-pc-windows-msvc
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Create release package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $releaseDir = "target/x86_64-pc-windows-msvc/release"
+          $zipName = "psmux-windows-x64"
+          New-Item -ItemType Directory -Path $zipName -Force
+
+          # Verify all expected binaries exist before copying
+          foreach ($exe in @("psmux.exe", "pmux.exe", "tmux.exe")) {
+            $path = Join-Path $releaseDir $exe
+            if (-not (Test-Path $path)) {
+              Write-Error "FATAL: Expected binary '$path' not found! Build may have failed silently."
+              Get-ChildItem $releaseDir -Filter "*.exe" | ForEach-Object { Write-Output "  Found: $($_.FullName) ($($_.Length) bytes)" }
+              exit 1
+            }
+          }
+
+          Copy-Item "$releaseDir/psmux.exe" "$zipName/psmux.exe" -ErrorAction Stop
+          Copy-Item "$releaseDir/pmux.exe" "$zipName/pmux.exe" -ErrorAction Stop
+          Copy-Item "$releaseDir/tmux.exe" "$zipName/tmux.exe" -ErrorAction Stop
+          Copy-Item "README.md" "$zipName/" -ErrorAction Stop
+          Copy-Item "LICENSE" "$zipName/" -ErrorAction Stop
+          Compress-Archive -Path "$zipName/*" -DestinationPath "$zipName.zip"
+
+          # Verify zip contents
+          $entries = [System.IO.Compression.ZipFile]::OpenRead("$zipName.zip").Entries.Name
+          foreach ($exe in @("psmux.exe", "pmux.exe", "tmux.exe")) {
+            if ($exe -notin $entries) {
+              Write-Error "FATAL: '$exe' missing from zip archive!"
+              exit 1
+            }
+          }
+          Write-Output "Zip contains: $($entries -join ', ')"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: psmux-windows-x64
+          path: psmux-windows-x64.zip
